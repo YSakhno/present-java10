@@ -1,0 +1,173 @@
+<section>
+  <h1>Application Class-Data Sharing</h1>
+
+  <small>
+    Yuri Sakhno<br />
+    GitHub: <a target="_blank" href="https://github.com/ysakhno/present-java10">ysakhno/present-java10</a>
+  </small>
+</section>
+
+<section>
+  <h2>Application Class-Data Sharing</h2>
+
+  <section>
+    AppCDS is an extension of the <a href="https://docs.oracle.com/javase/8/docs/technotes/guides/vm/class-data-sharing.html">commercial CDS feature</a> that Oracle&apos;s JVM contains since Java 8.
+  </section>
+
+  <section>
+    <p>It allows to reduce:</p>
+    <ul>
+      <li>launch times</li>
+      <li>response time outliers</li>
+      <li>and (if several JVMs run on the same machine), memory footprint</li>
+    </ul>
+  </section>
+</section>
+
+<section>
+  <h2>Prerequisites and Limitations</h2>
+
+  <section>
+    <ul>
+      <li>Supported only by OpenJDK <span class="grey">(because Oracle&apos;s JDK only contains CDS)</span></li>
+      <li>OpenJDK builds do not contain JavaFX, so using AppCDS with a JavaFX application won&apos;t be possible</li>
+    </ul>
+  </section>
+</section>
+
+<section>
+  <h2>App CDS in a Nutshell</h2>
+
+  <section>
+    <p>To execute a class&apos; bytecode, the JVM needs to perform a couple of preparatory steps. Given a class name, it:</p>
+    <ol>
+      <li>looks the class up in a JAR;</li>
+      <li>loads it</li>
+      <li>verifies the bytecode</li>
+      <li>and pulls it into an internal data structure</li>
+    </ol>
+    <p class="fragment">All of that takes time, which is most noticeable when the JVM is launching and needs to loads hundreds (more like thousands) of classes.</p>
+  </section>
+
+  <section>
+    <p>As long as the JARs used by the application do not change, this class-data is always the same. The JVM executes the same steps and comes to the same result every time it runs the app.</p>
+    <p class="fragment">The idea behind AppCDS is to create this data once, dump it into an archive, and then reuse that in future launches.</p>
+    <p class="fragment">It is even possible to share that data across simultaneously running JVM instances.</p>
+  </section>
+</section>
+
+<section>
+  <h2>Enable and use AppCDS in 3 easy steps:</h2>
+  <ol>
+    <li>create a list of classes to include in the archive (using the <code class="console" style="display:inline-block">-XX:DumpLoadedClassList</code> option)</li>
+    <li class="fragment">create an archive for the classes obtained in the previous step with <code class="console" style="display:inline-block">-Xshare:dump</code> option</li>
+    <li class="fragment">use the archive with the option <code class="console" style="display:inline-block">-Xshare:on</code></li>
+  </ol>
+</section>
+
+<section>
+  <h2>Practice: Creating archive for JDK&apos;s classes</h2>
+
+  <section>
+    <p>JRE already comes with a list of classes, which <code>-Xshare:dump</code> uses by default, so we can go straight to step 2 and generate the archive:</p>
+    <pre><code class="console">
+$ java -Xshare:dump
+    </code></pre>
+    <small>This command might require running it with admin rights, because by default the archive <code>classes.jsa</code> is created in <code>$JAVA_HOME/lib/server</code></small>
+    <span class="fragment">
+      <p>On Linux, the resulting file is 18M:</p>
+      <pre><code class="console">
+$ ls -lh $JAVA_HOME/lib/server
+total 38M
+-rw-r--r-- 1 root root 1.3K Mar 27 04:15 Xusage.txt
+-r--r--r-- 1 root root  18M Jun  1 17:36 classes.jsa
+-rw-r--r-- 1 root root  11K Mar 27 04:15 libjsig.so
+-rw-r--r-- 1 root root  21M Mar 27 04:15 libjvm.so
+      </code></pre>
+    </span>
+  </section>
+
+  <section>
+    <p>The <code>-Xshare:on</code> option reads from the default location, so using the created archive is pretty simple:</p>
+    <pre><code class="console">
+$ java -Xshare:on -jar app.jar
+    </code></pre>
+  </section>
+
+  <section>
+    <h3>Measuring the launch time</h3>
+
+    <p>A (very) crude way to measure the performance is to <code>time</code> the execution of an entire app with different options:</p>
+    <pre><code class="console" data-trim>
+$ time java -Xshare:off -jar app.jar
+This is Application Class-Data Sharing (AppCDS) demo.
+
+real    0m0.090s
+user    0m0.112s
+sys     0m0.004s
+ 
+$ time java -Xshare:on -jar app.jar
+This is Application Class-Data Sharing (AppCDS) demo.
+
+real    0m0.061s
+user    0m0.064s
+sys     0m0.024s
+    </code></pre>
+    <p class="fragment">Such crude test <em>does</em> show a measurable improvement when running with CDS enabled.</p>
+  </section>
+</section>
+
+<section>
+  <h2>Practice: Creating archive for app&apos;s classes</h2>
+
+  <section>
+    <p>First run the app with the following options:</p>
+    <pre><code class="console">
+$ java \
+    -XX:+UseAppCDS \
+    -XX:DumpLoadedClassList=classes.lst \
+    -jar app.jar
+    </code></pre>
+
+    <span class="fragment">
+      <p>This creates archive <code>classes.lst</code> in the current directory, which is actually a text file:</p>
+    <pre><code class="console">
+java/lang/Object
+java/lang/String
+java/io/Serializable
+java/lang/Comparable
+java/lang/CharSequence
+java/lang/Class
+java/lang/reflect/GenericDeclaration
+java/lang/reflect/AnnotatedElement
+java/lang/reflect/Type
+java/lang/Cloneable
+...
+    </code></pre>
+    </span>
+  </section>
+
+  <section>
+    <p>Next actually create the archive for classes from the list:</p>
+    <pre><code class="console">
+$ java \
+    -XX:+UseAppCDS \
+    -Xshare:dump \
+    -XX:SharedClassListFile=classes.lst \
+    -XX:SharedArchiveFile=app-cds.jsa \
+    --class-path app.jar
+    </code></pre>
+    <small>Note that the app is not launched with <code>-jar</code>, but rather a class path of all the application&apos;s JARs is specified.</small>
+  </section>
+
+  <section>
+    <p>Finally, launch the app with the created archive:</p>
+    <pre><code class="console">
+$ java \
+    -XX:+UseAppCDS \
+    -Xshare:on \
+    -XX:SharedArchiveFile=app-cds.jsa \
+    -jar app.jar
+    </code></pre>
+  </section>
+</section>

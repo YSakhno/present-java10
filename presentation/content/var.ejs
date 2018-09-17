@@ -1,0 +1,208 @@
+<section>
+  <h1>The <code>var</code> Keyword</h1>
+
+  <small>
+    Yuri Sakhno<br />
+    GitHub: <a target="_blank" href="https://github.com/ysakhno/present-java10">ysakhno/present-java10</a>
+  </small>
+</section>
+
+<section>
+  <p>Can be used in place of explicit type specialization for local variables that have immediate initializer.</p>
+
+  <pre><code class="lang-java" data-trim contenteditable>
+public String someMethod(int a, double b) {
+    var c = 2; // Automatically interred as int
+    var compute = (a + c) * b; // inferred as double
+    var result = new StringBuilder();
+    
+    result.append("Your result is: ");
+    result.append(compute);
+
+    return result.toString();
+}
+  </code></pre>
+</section>
+
+<section>
+  <h2>Good news!</h2>
+
+  <section>
+    <p><code>var</code> can be used in <strong><code>for</code></strong>-loops:</p>
+    <pre><code class="lang-java" data-trim contenteditable>
+    var numbers = List.of("a", "b", "c");
+    for (var n : numbers) {
+        System.out.print(n + " ");
+    }
+    for (var i = 0; i &lt; numbers.size(); i++) {
+        System.out.print(numbers.get(i) + " ");
+    }
+    </code></pre>
+  </section>
+
+  <section>
+    <p><code>var</code> can be used in <strong><code>try</code></strong> with resources:</p>
+    <pre><code class="lang-java" data-trim contenteditable>
+    try (var file = new FileInputStream(new File("no-such-file"))) {
+        new BufferedReader(new InputStreamReader(file))
+                .lines()
+                .forEach(System.out::println);
+    } catch (IOException ex) {
+        // well, at least we tried
+        System.out.println("There's actually no 'no-such-file' :)");
+    }
+    </code></pre>
+  </section>
+</section>
+
+<section>
+  <h3>indifferent news</h3>
+  <p><code>var</code> is <strong>not</strong> a reserved word; can be used to name methods and even variables (just not classes though):</p>
+  <pre><code class="lang-java" data-trim contenteditable>
+    private static void var() {
+        var var = "var is so var";
+    }
+
+    class var {} // Disallowed
+  </code></pre>
+</section>
+
+<section>
+  <h2>Current limitations of <code>var</code></h2>
+  <section>
+    <p>The <code>var</code> keyword cannot be used to infer types of:</p>
+      
+    <ul>
+      <li class="fragment">Class variables (fields)
+        <ul><li>even if it's <strong><code>static</code></strong> and <strong><code>final</code></strong></li></ul>
+      </li>
+      <li class="fragment">Arguments of a method</li>
+      <li class="fragment">Method return types</li>
+      <li class="fragment">Lamdba-initializer (see below)</li>
+    </ul>
+  </section>
+
+  <section>
+    <h3><code>var</code> and lambdas</h3>
+    
+    <p>The following code <em>cannot</em> be converted to use lambdas as of now</p>
+    
+    <pre><code class="lang-java" data-trim contenteditable>
+    public void summingFunc() {
+        BiFunction&lt;Integer, Integer, Integer&gt; sum = (a, b) -&gt; a + b;
+    }
+    </code></pre>
+    
+    <span class="fragment">
+      <p>So the code written like this</p>
+      <pre><code class="lang-java" data-trim contenteditable>
+    public void summingFunc() {
+        var sum = (a, b) -&gt; a + b;
+    }
+      </code></pre>
+      <p>currently won't work (even though it would be very beneficial)</p>
+    </span>
+  </section>
+
+  <section>
+    <p>Type of variables without initializers cannot be inferred:</p>
+    <pre><code class="lang-java" data-trim contenteditable>
+    var s; // What's *that* supposed to be?
+    var f; // Also not allowed, even though it is assigned later
+    f = "Foo"; // No, too late
+    </code></pre>
+  </section>
+
+  <section>
+    <p>Multiple initialization does not work with <code>var</code>:</p>
+    <pre><code class="lang-java" data-trim contenteditable>
+    var foo = 0, bar = 1; // one at a time, please
+    </code></pre>
+  </section>
+
+  <section>
+    <p><code>var</code> cannot be used with literal arrays:</p>
+    <pre><code class="lang-java" data-trim contenteditable>
+    var ints = { 0, 1, 2 }; // alas
+    </code></pre>
+  </section>
+</section>
+
+<section>
+  <h2>Pitfalls of <code>var</code></h2>
+</section>
+
+<section>
+  <h3><code>var</code> and the diamond-operator</h3>
+
+  <section>
+    <pre><code class="lang-java" data-trim contenteditable>
+private static ArrayList&lt;Integer&gt; createListOfIntegers() {
+    return new ArrayList&lt;&gt;();
+}
+
+public void whatsInTheList() {
+    var list = createListOfIntegers();
+        
+    list.add(5);
+    list.add(6);
+//    list.add("42"); // Won't be allowed
+
+    // ...
+}
+    </code></pre>
+
+    <p>While the code above works correctly, ...</p>
+  </section>
+
+  <section>
+    <p>... the following code initializes list to have <code>Object</code> generic type</p>
+
+    <pre><code class="lang-java" data-trim contenteditable>
+public void whatsInTheList() {
+    var list = new ArrayList&lt;&gt;();
+
+    list.add(5);
+    list.add(6);
+    list.add("this works");
+
+    // ...
+}
+    </code></pre>
+  </section>
+</section>
+
+<section>
+  <h3>initializing with literals</h3>
+
+  <section>
+    <p>The <code>var</code> keyword can be used to infer type from a literal value:</p>
+
+    <pre><code class="lang-java" data-trim contenteditable>
+    var integer = 12;
+    var ch = 'c';
+    var str = "Some text";
+    var bool = true;
+    var longNum = 987654321L;
+    var pi = 3.1415962;
+    </code></pre>
+
+    <p>These are all initialized as primitive values (apart from <code>String</code>, obviously).</p>
+  </section>
+
+  <section>
+    <p>But not all primitive types can be inferred this way. Compare these ...</p>
+    <pre><code class="lang-java" data-trim contenteditable>
+    byte smallVal = 5;
+    short oneSecond = 1000;
+    long distance = 1000000;
+    </code></pre>
+    <p>... with these</p>
+    <pre><code class="lang-java" data-trim contenteditable>
+    var smallVal = 5;
+    var oneSecond = 1000;
+    var distance = 1000000; // Notice the absence of the L suffix
+    </code></pre>
+    <p class="fragment">SPOILER: they will all be inferred as <code>int</code>s</p>
+  </section>
+</section>
